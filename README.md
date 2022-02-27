@@ -15,7 +15,7 @@ Following actions are allowed:
 `Giver` deposits and releases the funds, `Taker` withdraws.
 
 ```
-     Giver           Taker       Escrow
+     Giver           Taker           Escrow
        |               |               |
        |   deposit     |               |
        |------------------------------>|  ok
@@ -33,7 +33,7 @@ Following actions are allowed:
 `Giver` deposits but doesn't release funds, `Taker` fails on withdraw.
 
 ```
-     Giver           Taker       Escrow
+     Giver           Taker           Escrow
        |               |               |
        |   deposit     |               |
        |------------------------------>| ok
@@ -48,7 +48,7 @@ Following actions are allowed:
 `Giver` deposits, then cancels, `Taker` fails on withdraw.
 
 ```
-     Giver           Taker       Escrow
+     Giver           Taker           Escrow
        |               |               |
        |   deposit     |               |
        |------------------------------>| ok
