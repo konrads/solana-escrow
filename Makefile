@@ -28,7 +28,7 @@ setup:
 	cargo install --git https://github.com/project-serum/anchor --tag v0.20.1 anchor-cli --locked  # needed for M1 chip
 	# cargo install spl-token-cli
 	@echo "Generate wallets & airdrop"
-	@make wallet-gen airdrop
+	@make wallet-gen airdrop token-gen
 	@echo
 	@echo "Escrow account pubkey, add to lib.rs's declare_id!(), and Anchor.toml's programs.devnet"
 	@make escrow-account-pubkey
@@ -78,7 +78,7 @@ exec-withdraw:
 # Seperating into 2 targets as if inside 1 target, 'cat' is evaluated prior to spl-token create-token finishes
 _gen-token-output:
 	@spl-token create-token > token.output.tmp
-create-token: _gen-token-output
+token-gen: _gen-token-output
 	$(eval token=$(shell cat token.output.tmp | head -1 | awk '{ print $$3 }'))
 	@spl-token create-account $(token)
 	@spl-token mint $(token) 1000
