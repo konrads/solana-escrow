@@ -1,13 +1,12 @@
 [programs.devnet]
-escrow = "5wzgkaVnhuWsrxavTdNgCDtoyY6UM6VaYfY14SinS6Fh"
+escrow = "Bmn7S2JbiENi9ypnu6Dkpe9myNTzwBi3cbp34rFekPCm"
 
 [registry]
 url = "https://anchor.projectserum.com"
 
 [provider]
 cluster = "devnet"
-wallet = "./target/id.json"
-
+wallet = "./target/giver.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
