@@ -2,4 +2,6 @@
 .DS_Store
 target
 **/*.bak
+**/* copy.rs
+**/*.tmp
 node_modules

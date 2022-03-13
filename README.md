@@ -24,7 +24,7 @@ Following actions are allowed:
        |------------------------------>|  ok
        |               |               |
        |               |   withdraw    |
-       |               |-------------->|  ok
+       |               |-------------->|  ok, transfer to taker
        |               |               |
 ```
 
@@ -39,7 +39,10 @@ Following actions are allowed:
        |------------------------------>| ok
        |               |               |
        |               |   withdraw    |
-       |               |-------------->| err
+       |               |-------------->| ok, mark as ready for release, but not yet release
+       |               |               |
+       |   release     |               |
+       |------------------------------>| ok, transfers to taker
        |               |               |
 ```
 
@@ -59,6 +62,28 @@ Following actions are allowed:
        |               |   withdraw    |
        |               |-------------->| err
        |               |               |
+       |   release     |               |
+       |------------------------------>| err
+       |               |               |
+```
+
+`Giver` deposits, then releases, cancels, `Taker` fails on withdraw.
+
+```
+     Giver           Taker           Escrow
+       |               |               |
+       |   deposit     |               |
+       |------------------------------>| ok
+       |               |               |
+       |   release     |               |
+       |------------------------------>| ok
+       |               |               |
+       |   cancel      |               |
+       |------------------------------>| ok
+       |               |               |
+       |               |   withdraw    |
+       |               |-------------->| err
+       |               |               |
 ```
 
 ## Development process
@@ -67,7 +92,7 @@ Following actions are allowed:
 make clean setup
 ```
 
-Add account pubkey to lib.rs's declare_id!(), and Anchor.toml's programs.devnet
+Add account pubkey to lib.rs's declare_id!(), and Anchor.toml's programs.devnet/programs.testnet
 
 Repeat as needed
 ```
