@@ -4,13 +4,8 @@
         "@solana/buffer-layout": "^4.0.0",
         "@solana/spl-token": "^0.2.0",
         "@solana/web3.js": "1.30.2",
-        "@types/chai": "^4.2.22",
-        "@types/mocha": "^9.0.0",
         "bn.js": "^5.2.0",
         "borsh": "^0.7.0",
-        "chai": "^4.3.4",
-        "mocha": "^9.0.0",
-        "ts-mocha": "^9.0.2",
         "typescript": "^4.5.4"
     },
     "devDependencies": {
@@ -18,7 +13,6 @@
         "chai": "^4.3.4",
         "minimist": "^1.2.5",
         "mocha": "^9.0.3",
-        "ts-mocha": "^8.0.0",
-        "typescript": "^4.3.5"
+        "ts-mocha": "^9.0.2"
     }
 }
