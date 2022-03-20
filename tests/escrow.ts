@@ -1,7 +1,7 @@
 import * as anchor from "@project-serum/anchor";
 import { Program, BN, IdlAccounts } from "@project-serum/anchor";
 import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID, Token } from "@solana/spl-token";
+import { TOKEN_PROGRAM_ID, createMint, createAccount, mintTo, getAccount } from "@solana/spl-token";
 import { assert } from "chai";
 import { Escrow } from "../target/types/escrow";
 
@@ -28,9 +28,9 @@ describe("escrow", () => {
 
   const takerProvider = giverProvider; // FIXME: new anchor.Provider(provider.connection, new anchor.Wallet(taker), {});
 
-  let mint: Token = null;
+  let mint: PublicKey = null;
   let mintAuthority = Keypair.generate();
-  let vaultAuthority: PublicKey = null;
+  let vaultAuthority: PublicKey = null;  // PDA
   let vaultAuthorityBump: number = null;
 
   let giverTokenAccount: PublicKey = null;
@@ -49,29 +49,18 @@ describe("escrow", () => {
       "confirmed"
     );
 
-    await takerProvider.connection.confirmTransaction(
-      await takerProvider.connection.requestAirdrop(taker.publicKey, 10000000000),
+    await giverProvider.connection.confirmTransaction(
+      await giverProvider.connection.requestAirdrop(taker.publicKey, 10000000000),
       "confirmed"
     );
 
-    mint = await Token.createMint(
-      giverProvider.connection,
-      giver,
-      mintAuthority.publicKey,
-      null,
-      0,
-      TOKEN_PROGRAM_ID
-    );
+    // mint holds token metadata
+    mint = await createMint(giverProvider.connection, giver, mintAuthority.publicKey, null, 0);
 
-    giverTokenAccount = await mint.createAccount(giverProvider.wallet.publicKey);
-    takerTokenAccount = await mint.createAccount(takerProvider.wallet.publicKey);
+    giverTokenAccount = await createAccount(giverProvider.connection, giver, mint, giver.publicKey);
+    takerTokenAccount = await createAccount(giverProvider.connection, giver, mint, taker.publicKey);
 
-    await mint.mintTo(
-      vaultTokenAccount,
-      mintAuthority.publicKey,
-      [mintAuthority],
-      giverBalance
-    );
+    await mintTo(giverProvider.connection, giver, mint, giverTokenAccount, mint, giverBalance);
 
     const [_pda, _bumpSeed] = await PublicKey.findProgramAddress(
       [Buffer.from(anchor.utils.bytes.utf8.encode("escrow"))],
@@ -98,13 +87,13 @@ describe("escrow", () => {
           escrowAccount: escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,   // needed? is not in original 
         },
         signers: [escrowAccount, vaultTokenAccount],
       }
     );
 
-    let _vaultTokenAccountA = await mint.getAccountInfo(vaultTokenAccount);
+    let _vaultTokenAccountA = await getAccount(giverProvider.connection, vaultTokenAccount.publicKey);
     let _escrowAccount: EscrowAccount = await program.account.escrowAccount.fetch(escrowAccount.publicKey);
 
     // Validate new vault authority

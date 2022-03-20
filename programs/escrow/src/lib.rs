@@ -30,7 +30,9 @@ pub mod escrow {
         escrow_account.vault_authority_bump = vault_authority_bump;
         escrow_account.is_released = false;
 
-        // switch authority to newly created vault_authority
+        // switch authority to vault_authority PDA
+        // FIXME: should set this via Context instead
+        // ...would I need vaultAuthority as a signer?
         token::set_authority(
             CpiContext::new(
                 token_program.clone(),
