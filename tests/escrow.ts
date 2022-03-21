@@ -7,20 +7,11 @@ import { Escrow } from "../target/types/escrow";
 
 type EscrowAccount = IdlAccounts<Escrow>["escrowAccount"];
 
-// import { provider, program } from '../config';
-
-// export function programPaidBy(payer: anchor.web3.Keypair): anchor.Program {
-//   const newProvider = new anchor.Provider(provider.connection, new anchor.Wallet(payer), {});
-
-//   return new anchor.Program(program.idl as anchor.Idl, program.programId, newProvider)
-// }
-
-
 describe("escrow", () => {
   const provider = anchor.Provider.env();
   const program = anchor.workspace.Escrow as Program<Escrow>;
-  const airdrop = 100000000000000;
-  const giverBalance = 10000000000;
+  const airdrop      = 1000000000;
+  const giverBalance = 10000000;
   const escrowAmount = 100000;
 
   type TestCtx = {
@@ -202,6 +193,24 @@ describe("escrow", () => {
         }
       }
     );
+
+    // validate transferred amount
+    let _giverTokenAccount = await getAccount(provider.connection, ctx.giverTokenAccount);
+    assert.equal(_giverTokenAccount.amount, giverBalance - escrowAmount);
+    let _takerTokenAccount = await getAccount(provider.connection, ctx.takerTokenAccount);
+    assert.equal(_takerTokenAccount.amount, escrowAmount);
+
+    // validate accounts no longer exist - FIXME: there must be a nicer way...
+    try {
+      await getAccount(provider.connection, ctx.vaultTokenAccount.publicKey);
+    } catch (err: any) {
+      assert.equal(err.name, 'TokenAccountNotFoundError')
+    }
+    try {
+      await getAccount(provider.connection, ctx.escrowAccount.publicKey);
+    } catch (err: any) {
+      assert.equal(err.name, 'TokenAccountNotFoundError')
+    }
   });
 
   it("Cancels escrow", async () => {
@@ -228,9 +237,6 @@ describe("escrow", () => {
       }
     );
 
-    // console.log("### signer giver:             ", ctx.giver.publicKey.toString());
-    // console.log("### signer escrowAccount:     ", ctx.escrowAccount.publicKey.toString());
-    // console.log("### signer vaultTokenAccount: ", ctx.vaultTokenAccount.publicKey.toString());
     await program.rpc.cancel(
       {
         accounts: {
@@ -243,17 +249,49 @@ describe("escrow", () => {
         }
       }
     );
+
+
+    // validate transferred amount
+    let _giverTokenAccount = await getAccount(provider.connection, ctx.giverTokenAccount);
+    assert.equal(_giverTokenAccount.amount, giverBalance);
+    let _takerTokenAccount = await getAccount(provider.connection, ctx.takerTokenAccount);
+    assert.equal(_takerTokenAccount.amount, 0);
+
+    // validate accounts no longer exist - FIXME: there must be a nicer way...
+    try {
+      await getAccount(provider.connection, ctx.vaultTokenAccount.publicKey);
+    } catch (err: any) {
+      assert.equal(err.name, 'TokenAccountNotFoundError')
+    }
+    try {
+      await getAccount(provider.connection, ctx.escrowAccount.publicKey);
+    } catch (err: any) {
+      assert.equal(err.name, 'TokenAccountNotFoundError')
+    }
   });
 
-  // it("Deposit failures", async () => {
-  // });
+  it("Deposit failures", async () => {
+    throw Error("unimplemented!")
+  });
 
-  // it("Release failures", async () => {
-  // });
+  it("Release failures", async () => {
+    throw Error("unimplemented!")
+  });
 
-  // it("Cancel failures", async () => {
-  // });
+  it("Cancel failures", async () => {
+    throw Error("unimplemented!")
+  });
 
-  // it("Withdraw failures", async () => {
-  // });
+  it("Withdraw failures", async () => {
+    throw Error("unimplemented!")
+  });
 });
+
+async function expectError(fn: Function, errorString: String) {
+  await assert.rejects(fn(), (err: any) => {
+    if (err.msg === errorString) {
+      return true;
+    }
+    return false;
+  });
+}
