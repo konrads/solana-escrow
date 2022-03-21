@@ -1,6 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, CloseAccount, Mint, SetAuthority, TokenAccount, Transfer};
-use spl_token::instruction::AuthorityType;
+use anchor_spl::token::{self, CloseAccount, Mint, TokenAccount, Transfer};
 
 declare_id!("HG6eAHrTi1WM4QtC9taAiVexvFfDyWbZPCYXNXy5zn4A");
 
@@ -21,7 +20,7 @@ pub mod escrow {
     /// - set vault_token_account authority to PDA
     /// - transfer funds from giver_token_account to vault_token_account
     pub fn deposit(ctx: Context<Deposit>, amount: u64, vault_authority_bump: u8) -> ProgramResult {
-        let Deposit { giver, taker, giver_token_account, vault_token_account, token_program, escrow_account, vault_authority, .. } = ctx.accounts;
+        let Deposit { giver, taker, giver_token_account, vault_token_account, token_program, escrow_account, .. } = ctx.accounts;
 
         escrow_account.giver_key = *giver.key;
         escrow_account.taker_key = *taker.key;
@@ -120,7 +119,7 @@ pub mod escrow {
                     destination: giver.clone(),
                     authority:   vault_authority.clone(),
                 }
-            ), // .with_signer(&[&authority_seeds[..]]),  -- needed?
+            ).with_signer(&[&authority_seeds[..]]),
         )?;
 
         Ok(())
@@ -169,14 +168,11 @@ pub struct Release<'info> {
 
 #[derive(Accounts)]
 pub struct Cancel<'info> {
-    #[account(mut, signer)]
+    #[account(mut)]
     pub giver: AccountInfo<'info>,
     #[account(mut)]
     pub giver_token_account: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        close = giver
-    )]
+    #[account(mut)]
     pub vault_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
@@ -193,14 +189,11 @@ pub struct Cancel<'info> {
 pub struct Withdraw<'info> {
     #[account(mut)]
     pub giver: AccountInfo<'info>,
-    #[account(mut, signer)]
+    #[account()]
     pub taker: AccountInfo<'info>,
     #[account(mut)]
     pub taker_token_account: Account<'info, TokenAccount>,
-    #[account(
-        mut,
-        close = giver
-    )]
+    #[account(mut)]
     pub vault_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
@@ -208,7 +201,7 @@ pub struct Withdraw<'info> {
         close = giver
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
-    #[account(mut)]  // cannot add `close = giver` due to usage of AccountInfo instead of Account?
+    #[account()]
     pub vault_authority: AccountInfo<'info>,
     pub token_program: AccountInfo<'info>,
 }

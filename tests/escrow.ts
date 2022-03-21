@@ -18,185 +18,242 @@ type EscrowAccount = IdlAccounts<Escrow>["escrowAccount"];
 
 describe("escrow", () => {
   const provider = anchor.Provider.env();
-  anchor.setProvider(provider);
-
   const program = anchor.workspace.Escrow as Program<Escrow>;
-  // const payer = Keypair.generate();
-
-  const giver = Keypair.generate();
-  const taker = Keypair.generate();
-//  const payer = Keypair.generate();
-
-  const takerProvider = provider; // FIXME: new anchor.Provider(provider.connection, new anchor.Wallet(taker), {});
-
-  let mint: PublicKey = null;
-  let mintAuthority = Keypair.generate();
-  let vaultAuthority: PublicKey = null;  // PDA
-  let vaultAuthorityBump: number = null;
-
-  let giverTokenAccount: PublicKey = null;
-  let takerTokenAccount: PublicKey = null;
-
-  const escrowAccount = Keypair.generate();
-  const vaultTokenAccount = Keypair.generate();
-
+  const airdrop = 100000000000000;
   const giverBalance = 10000000000;
   const escrowAmount = 100000;
 
-  before(async () => {
+  type TestCtx = {
+    giver?: anchor.web3.Keypair;
+    taker?: anchor.web3.Keypair;
+    mint?: PublicKey;
+    mintAuthority?: anchor.web3.Keypair;
+    vaultAuthority?: PublicKey;
+    vaultAuthorityBump?: number;
+    giverTokenAccount?: PublicKey;
+    takerTokenAccount?: PublicKey;
+    escrowAccount?: anchor.web3.Keypair;
+    vaultTokenAccount?: anchor.web3.Keypair;
+  }
+
+  async function setup(): Promise<TestCtx> {
+    let ctx: TestCtx = {};
+    ctx.giver = Keypair.generate();
+    ctx.taker = Keypair.generate();
+    ctx.mintAuthority = Keypair.generate();
+    ctx.escrowAccount = Keypair.generate();
+    ctx.vaultTokenAccount = Keypair.generate();
+
     // Airdropping tokens to a giver/taker
     await provider.connection.confirmTransaction(
-      await provider.connection.requestAirdrop(giver.publicKey, 1000000000000),
+      await provider.connection.requestAirdrop(ctx.giver.publicKey, airdrop),
       "confirmed"
     );
 
     await provider.connection.confirmTransaction(
-      await provider.connection.requestAirdrop(taker.publicKey, 10000000000),
+      await provider.connection.requestAirdrop(ctx.taker.publicKey, airdrop),
       "confirmed"
     );
 
     // mint holds token metadata
-    mint = await createMint(provider.connection, giver, mintAuthority.publicKey, null, 0);
+    ctx.mint = await createMint(provider.connection, ctx.giver, ctx.mintAuthority.publicKey, null, 0);
 
-    giverTokenAccount = await createAccount(provider.connection, giver, mint, giver.publicKey);
-    takerTokenAccount = await createAccount(provider.connection, taker, mint, taker.publicKey);
+    ctx.giverTokenAccount = await createAccount(provider.connection, ctx.giver, ctx.mint, ctx.giver.publicKey);
+    ctx.takerTokenAccount = await createAccount(provider.connection, ctx.taker, ctx.mint, ctx.taker.publicKey);
 
-    await mintTo(provider.connection, giver, mint, giverTokenAccount, mintAuthority, giverBalance);
+    await mintTo(provider.connection, ctx.giver, ctx.mint, ctx.giverTokenAccount, ctx.mintAuthority, giverBalance);
 
     const [_pda, _bumpSeed] = await PublicKey.findProgramAddress(
       [Buffer.from(anchor.utils.bytes.utf8.encode("escrow"))],
       program.programId
     );
 
-    vaultAuthority = _pda;
-    vaultAuthorityBump = _bumpSeed;
-  });
+    ctx.vaultAuthority = _pda;
+    ctx.vaultAuthorityBump = _bumpSeed;
 
-  it("Initialize escrow", async () => {
+    return ctx;
+  }
+
+  ///////////////////// Tests /////////////////////
+
+  it("Deposit into escrow", async () => {
+    const ctx = await setup();
+
     await program.rpc.deposit(
       new BN(escrowAmount),
-      new BN(vaultAuthorityBump),
+      new BN(ctx.vaultAuthorityBump),
       {
         accounts: {
-          mint: mint,
-          giver: giver.publicKey,
-          taker: taker.publicKey,
-          vaultAuthority: vaultAuthority,
-          giverTokenAccount: giverTokenAccount,
-          takerTokenAccount: takerTokenAccount,
-          vaultTokenAccount: vaultTokenAccount.publicKey,
-          escrowAccount: escrowAccount.publicKey,
+          mint: ctx.mint,
+          giver: ctx.giver.publicKey,
+          taker: ctx.taker.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          giverTokenAccount: ctx.giverTokenAccount,
+          takerTokenAccount: ctx.takerTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
           tokenProgram: TOKEN_PROGRAM_ID,
-          rent: anchor.web3.SYSVAR_RENT_PUBKEY,   // needed? is not in original 
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         },
-        signers: [giver, escrowAccount, vaultTokenAccount],
+        signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
       }
     );
 
-    let _vaultTokenAccountA = await getAccount(provider.connection, vaultTokenAccount.publicKey);
-    let _escrowAccount: EscrowAccount = await program.account.escrowAccount.fetch(escrowAccount.publicKey);
+    let _vaultTokenAccountA = await getAccount(provider.connection, ctx.vaultTokenAccount.publicKey);
+    let _escrowAccount: EscrowAccount = await program.account.escrowAccount.fetch(ctx.escrowAccount.publicKey);
 
     // Validate new vault authority
-    assert.ok(_vaultTokenAccountA.owner.equals(vaultAuthority));
+    assert.ok(_vaultTokenAccountA.owner.equals(ctx.vaultAuthority));
 
     // Validate escrow account
-    assert.ok(_escrowAccount.giverKey.equals(giver.publicKey));
-    assert.ok(_escrowAccount.takerKey.equals(taker.publicKey));
+    assert.ok(_escrowAccount.giverKey.equals(ctx.giver.publicKey));
+    assert.ok(_escrowAccount.takerKey.equals(ctx.taker.publicKey));
     assert.equal(_escrowAccount.amount.toNumber(), escrowAmount);
-    assert.equal(_escrowAccount.vaultAuthorityBump, vaultAuthorityBump);
-    assert.ok(_escrowAccount.giverTokenAccount.equals(giverTokenAccount));
+    assert.equal(_escrowAccount.vaultAuthorityBump, ctx.vaultAuthorityBump);
+    assert.ok(_escrowAccount.giverTokenAccount.equals(ctx.giverTokenAccount));
     assert.ok(! _escrowAccount.isReleased);
   });
 
-  // it("Exchange escrow", async () => {
-  //   await program.rpc.exchange({
-  //     accounts: {
-  //       taker: provider.wallet.publicKey,
-  //       takerDepositTokenAccount: takerTokenAccountB,
-  //       takerReceiveTokenAccount: takerTokenAccountA,
-  //       pdaDepositTokenAccount: initializerTokenAccountA,
-  //       initializerReceiveTokenAccount: initializerTokenAccountB,
-  //       initializerMainAccount: provider.wallet.publicKey,
-  //       escrowAccount: escrowAccount.publicKey,
-  //       pdaAccount: pda,
-  //       tokenProgram: TOKEN_PROGRAM_ID,
-  //     },
-  //   });
+  it("Release escrow funds", async () => {
+    const ctx = await setup();
 
-  //   let _takerTokenAccountA = await mintA.getAccountInfo(takerTokenAccountA);
-  //   let _takerTokenAccountB = await mintB.getAccountInfo(takerTokenAccountB);
-  //   let _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
-  //   let _initializerTokenAccountB = await mintB.getAccountInfo(initializerTokenAccountB );
+    await program.rpc.deposit(
+      new BN(escrowAmount),
+      new BN(ctx.vaultAuthorityBump),
+      {
+        accounts: {
+          mint: ctx.mint,
+          giver: ctx.giver.publicKey,
+          taker: ctx.taker.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          giverTokenAccount: ctx.giverTokenAccount,
+          takerTokenAccount: ctx.takerTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        },
+        signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
+      }
+    );
 
-  //   // Check that the initializer gets back ownership of their token account.
-  //   assert.ok(_takerTokenAccountA.owner.equals(provider.wallet.publicKey));
+    await program.rpc.release(
+      {
+        accounts: {
+          giver: ctx.giver.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+        },
+        signers: [ctx.giver],
+      }
+    );
 
-  //   assert.ok(_takerTokenAccountA.amount.toNumber() == initializerAmount);
-  //   assert.ok(_initializerTokenAccountA.amount.toNumber() == initializerABalance - initializerAmount);
-  //   assert.ok(_initializerTokenAccountB.amount.toNumber() == takerAmount);
-  //   assert.ok(_takerTokenAccountB.amount.toNumber() == takerBBalance - takerAmount);
+    let _escrowAccount: EscrowAccount = await program.account.escrowAccount.fetch(ctx.escrowAccount.publicKey);
+
+    // Validate new vault authority
+    assert.ok(_escrowAccount.isReleased);
+  });
+
+  it("Withdraw escrow funds", async () => {
+    const ctx = await setup();
+
+    await program.rpc.deposit(
+      new BN(escrowAmount),
+      new BN(ctx.vaultAuthorityBump),
+      {
+        accounts: {
+          mint: ctx.mint,
+          giver: ctx.giver.publicKey,
+          taker: ctx.taker.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          giverTokenAccount: ctx.giverTokenAccount,
+          takerTokenAccount: ctx.takerTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        },
+        signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
+      }
+    );
+
+    await program.rpc.release(
+      {
+        accounts: {
+          giver: ctx.giver.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+        },
+        signers: [ctx.giver],
+      }
+    );
+
+    await program.rpc.withdraw(
+      {
+        accounts: {
+          giver: ctx.giver.publicKey,
+          taker: ctx.taker.publicKey,
+          takerTokenAccount: ctx.takerTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }
+      }
+    );
+  });
+
+  it("Cancels escrow", async () => {
+    const ctx = await setup();
+
+    await program.rpc.deposit(
+      new BN(escrowAmount),
+      new BN(ctx.vaultAuthorityBump),
+      {
+        accounts: {
+          mint: ctx.mint,
+          giver: ctx.giver.publicKey,
+          taker: ctx.taker.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          giverTokenAccount: ctx.giverTokenAccount,
+          takerTokenAccount: ctx.takerTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        },
+        signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
+      }
+    );
+
+    // console.log("### signer giver:             ", ctx.giver.publicKey.toString());
+    // console.log("### signer escrowAccount:     ", ctx.escrowAccount.publicKey.toString());
+    // console.log("### signer vaultTokenAccount: ", ctx.vaultTokenAccount.publicKey.toString());
+    await program.rpc.cancel(
+      {
+        accounts: {
+          giver: ctx.giver.publicKey,
+          giverTokenAccount: ctx.giverTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        }
+      }
+    );
+  });
+
+  // it("Deposit failures", async () => {
   // });
 
-  // it("Initialize escrow and cancel escrow", async () => {
-  //   let newEscrow = Keypair.generate();
+  // it("Release failures", async () => {
+  // });
 
-  //   // Put back tokens into initializer token A account.
-  //   await mintA.mintTo(
-  //     initializerTokenAccountA,
-  //     mintAuthority.publicKey,
-  //     [mintAuthority],
-  //     initializerAmount
-  //   );
+  // it("Cancel failures", async () => {
+  // });
 
-  //   await program.rpc.initializeEscrow(
-  //     new BN(initializerAmount),
-  //     new BN(takerAmount),
-  //     {
-  //       accounts: {
-  //         initializer: provider.wallet.publicKey,
-  //         initializerDepositTokenAccount: initializerTokenAccountA,
-  //         initializerReceiveTokenAccount: initializerTokenAccountB,
-  //         escrowAccount: newEscrow.publicKey,
-  //         systemProgram: SystemProgram.programId,
-  //         tokenProgram: TOKEN_PROGRAM_ID,
-  //       },
-  //       signers: [newEscrow],
-  //     }
-  //   );
-
-  //   let _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
-
-  //   // Check that the new owner is the PDA.
-  //   assert.ok(_initializerTokenAccountA.owner.equals(pda));
-
-  //   // Cancel the escrow.
-  //   await program.rpc.cancelEscrow({
-  //     accounts: {
-  //       initializer: provider.wallet.publicKey,
-  //       pdaDepositTokenAccount: initializerTokenAccountA,
-  //       pdaAccount: pda,
-  //       escrowAccount: newEscrow.publicKey,
-  //       tokenProgram: TOKEN_PROGRAM_ID,
-  //     },
-  //   });
-
-  //   // Check the final owner should be the provider public key.
-  //   _initializerTokenAccountA = await mintA.getAccountInfo(initializerTokenAccountA);
-  //   assert.ok(_initializerTokenAccountA.owner.equals(provider.wallet.publicKey));
-
-  //   // Check all the funds are still there.
-  //   assert.ok(_initializerTokenAccountA.amount.toNumber() == initializerABalance);
+  // it("Withdraw failures", async () => {
   // });
 });
-
-
-
-
-
-// QUESTIONS:
-// - what exactly is a provider? What is provider wallet?
-// - Error: Wrong input type for account "takerTokenAccount" in the instruction accounts object for instruction "deposit". Expected PublicKey or string.
-// - rent - when needed?
-// - error tracing onchain?
-// - signing for only account creation?
