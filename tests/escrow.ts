@@ -2,7 +2,7 @@ import * as anchor from "@project-serum/anchor";
 import { Program, BN, IdlAccounts } from "@project-serum/anchor";
 import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, createMint, createAccount, mintTo, getAccount } from "@solana/spl-token";
-import { expect, assert } from "chai";
+import { assert } from "chai";
 import { Escrow } from "../target/types/escrow";
 
 type EscrowAccount = IdlAccounts<Escrow>["escrowAccount"];
@@ -184,6 +184,7 @@ describe("escrow", () => {
     await program.rpc.withdraw(
       {
         accounts: {
+          mint: ctx.mint,
           giver: ctx.giver.publicKey,
           taker: ctx.taker.publicKey,
           takerTokenAccount: ctx.takerTokenAccount,
@@ -233,6 +234,7 @@ describe("escrow", () => {
     await program.rpc.cancel(
       {
         accounts: {
+          mint: ctx.mint,
           giver: ctx.giver.publicKey,
           giverTokenAccount: ctx.giverTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
@@ -243,7 +245,6 @@ describe("escrow", () => {
       }
     );
 
-
     // validate transferred amount
     let _giverTokenAccount = await getAccount(provider.connection, ctx.giverTokenAccount);
     assert.equal(_giverTokenAccount.amount, giverBalance);
@@ -253,6 +254,56 @@ describe("escrow", () => {
     // validate accounts no longer exist - FIXME: there must be a nicer way...
     expectError(async () => getAccount(provider.connection, ctx.vaultTokenAccount.publicKey) , 'TokenAccountNotFoundError');
     expectError(async () => getAccount(provider.connection, ctx.escrowAccount.publicKey) , 'TokenAccountNotFoundError');
+  });
+
+  it("Release and cancels failure", async () => {
+    const ctx = await setup();
+
+    await program.rpc.deposit(
+      new BN(escrowAmount),
+      new BN(ctx.vaultAuthorityBump),
+      {
+        accounts: {
+          mint: ctx.mint,
+          giver: ctx.giver.publicKey,
+          taker: ctx.taker.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          giverTokenAccount: ctx.giverTokenAccount,
+          takerTokenAccount: ctx.takerTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        },
+        signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
+      }
+    );
+
+    await program.rpc.release(
+      {
+        accounts: {
+          giver: ctx.giver.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+        },
+        signers: [ctx.giver],
+      }
+    );
+    
+    await expectError(async () => {
+      await program.rpc.cancel(
+        {
+          accounts: {
+            mint: ctx.mint,
+            giver: ctx.giver.publicKey,
+            giverTokenAccount: ctx.giverTokenAccount,
+            vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+            escrowAccount: ctx.escrowAccount.publicKey,
+            vaultAuthority: ctx.vaultAuthority,
+            tokenProgram: TOKEN_PROGRAM_ID,
+          }
+        }
+      )}, `6000: Attempted cancel after release`);
   });
 
   it("Deposit failure - bogus mint", async () => {
@@ -313,8 +364,10 @@ describe("escrow", () => {
 
   it("Deposit failure - empty giver account", async () => {
     const ctx = await setup();
+    await sleep(1000);
     // use empty (no tokens) giver token account
-    let emptyTokenAccount = await createAccount(provider.connection, ctx.giver, ctx.mint, ctx.giver.publicKey);
+    let emptyTokenAccount = await createAccount(provider.connection, ctx.giver, ctx.mint, ctx.giver.publicKey, Keypair.generate());
+    await mintTo(provider.connection, ctx.giver, ctx.mint, emptyTokenAccount, ctx.mintAuthority, 100);
 
     await expectError(async () => {
       await program.rpc.deposit(
@@ -337,8 +390,8 @@ describe("escrow", () => {
           signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
         }
       );
-    }, `...empty giver token account...`);
-});
+    }, `2003: A raw constraint was violated`);
+  });
 
   // it("Release failures", async () => {
   //   throw Error("unimplemented!")
@@ -351,8 +404,11 @@ describe("escrow", () => {
   // it("Withdraw failures", async () => {
   //   throw Error("unimplemented!")
   // });
+
 });
 
+
+///////////////////// Utils /////////////////////
 async function expectError(fn: Function, errorMsg: String) {
   try {
     await fn();
@@ -360,4 +416,8 @@ async function expectError(fn: Function, errorMsg: String) {
   } catch (err: any) {
     assert.equal(err.message, errorMsg, `Unexpected error message`)
   }
+}
+
+export async function sleep(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms, undefined));
 }

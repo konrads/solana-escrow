@@ -172,9 +172,10 @@ pub struct Release<'info> {
 
 #[derive(Accounts)]
 pub struct Cancel<'info> {
+    pub mint: Account<'info, Mint>,
     #[account(mut)]
     pub giver: AccountInfo<'info>,
-    #[account(mut)]
+    #[account(mut, constraint = giver_token_account.mint == mint.key())]
     pub giver_token_account: Account<'info, TokenAccount>,
     #[account(mut)]
     pub vault_token_account: Account<'info, TokenAccount>,
@@ -194,11 +195,12 @@ pub struct Cancel<'info> {
 
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
+    pub mint: Account<'info, Mint>,
     #[account(mut)]
     pub giver: AccountInfo<'info>,
     #[account()]
     pub taker: AccountInfo<'info>,
-    #[account(mut)]
+    #[account(mut, constraint = taker_token_account.mint == mint.key())]
     pub taker_token_account: Account<'info, TokenAccount>,
     #[account(mut)]
     pub vault_token_account: Account<'info, TokenAccount>,
