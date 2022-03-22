@@ -68,13 +68,15 @@ Following actions are allowed:
        |               |               |
 ```
 
-## Unit testing
-Following tests via typescript interface
+## Integration testing
+Test via typescript interface
 ```
 anchor test
 ```
 
 ## Development process on testnet
+Following is a (work in progress... :frowning_face:) attempt of running tests on testnet.
+
 1-off setup
 ```
 make clean setup
