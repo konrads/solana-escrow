@@ -68,7 +68,13 @@ Following actions are allowed:
        |               |               |
 ```
 
-## Development process
+## Unit testing
+Following tests via typescript interface
+```
+anchor test
+```
+
+## Development process on testnet
 1-off setup
 ```
 make clean setup
