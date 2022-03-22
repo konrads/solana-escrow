@@ -29,16 +29,6 @@ pub mod escrow {
         escrow_account.vault_authority_bump = vault_authority_bump;
         escrow_account.is_released = false;
 
-        // NOTE: switch authority to vault_authority PDA via context, hence don't need the below: token::authority = vault_authority
-        // token::set_authority(
-        //     CpiContext::new(
-        //         token_program.clone(),
-        //         SetAuthority { account_or_mint: vault_token_account.to_account_info(), current_authority: giver.clone() },
-        //     ),
-        //     AuthorityType::AccountOwner,
-        //     Some(vault_authority.key())
-        // )?;
-
         // transfer the token to vault_account
         token::transfer(
             CpiContext::new(

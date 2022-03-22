@@ -28,24 +28,6 @@ Following actions are allowed:
        |               |               |
 ```
 
-### Premature withdraw attempt
-
-`Giver` deposits but doesn't release funds, `Taker` fails on withdraw.
-
-```
-     Giver           Taker           Escrow
-       |               |               |
-       |   deposit     |               |
-       |------------------------------>| ok
-       |               |               |
-       |               |   withdraw    |
-       |               |-------------->| ok, mark as ready for release, but not yet release
-       |               |               |
-       |   release     |               |
-       |------------------------------>| ok, transfers to taker
-       |               |               |
-```
-
 ### Cancelled withdraw attempt
 
 `Giver` deposits, then cancels, `Taker` fails on withdraw.

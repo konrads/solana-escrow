@@ -393,9 +393,44 @@ describe("escrow", () => {
     }, `2003: A raw constraint was violated`);
   });
 
-  // it("Release failures", async () => {
-  //   throw Error("unimplemented!")
-  // });
+  it("Release failures", async () => {
+    const ctx = await setup();
+    const bogusWallet = Keypair.generate();
+
+    await program.rpc.deposit(
+      new BN(escrowAmount),
+      new BN(ctx.vaultAuthorityBump),
+      {
+        accounts: {
+          mint: ctx.mint,
+          giver: ctx.giver.publicKey,
+          taker: ctx.taker.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          giverTokenAccount: ctx.giverTokenAccount,
+          takerTokenAccount: ctx.takerTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          systemProgram: SystemProgram.programId,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        },
+        signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
+      }
+    );
+
+    // using wallet that wasn't used in deposit
+    await expectError(async () => {
+      await program.rpc.release(
+        {
+          accounts: {
+            giver: bogusWallet.publicKey,
+            escrowAccount: ctx.escrowAccount.publicKey,
+          },
+          signers: [bogusWallet],
+        }
+      );
+    }, `2003: A raw constraint was violated`);
+  });
 
   // it("Cancel failures", async () => {
   //   throw Error("unimplemented!")
