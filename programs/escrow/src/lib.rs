@@ -9,11 +9,11 @@ pub enum ErrorCode {
     CancelReleasedAccountError,
 }
 
+const ESCROW_PDA_SEED: &[u8] = b"escrow";
+
 #[program]
 pub mod escrow {
     use super::*;
-
-    const ESCROW_PDA_SEED: &[u8] = b"escrow";
 
     /// Deposit and lock the funds by:
     /// - populate escrow account state
@@ -144,6 +144,10 @@ pub struct Deposit<'info> {
     #[account(mut, signer)]
     pub giver: AccountInfo<'info>,
     pub taker: AccountInfo<'info>,
+    #[account(
+        seeds = [ESCROW_PDA_SEED],
+        bump = vault_authority_bump
+    )]
     pub vault_authority: AccountInfo<'info>,
     #[account(mut, constraint = giver_token_account.mint == mint.key() && giver_token_account.amount >= amount)]
     pub giver_token_account: Account<'info, TokenAccount>,
@@ -180,7 +184,10 @@ pub struct Cancel<'info> {
         close = giver
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
-    #[account(mut)]  // cannot add `close = giver` due to usage of AccountInfo instead of Account?
+    #[account(
+        seeds = [b"escrow"],
+        bump = escrow_account.vault_authority_bump
+    )]
     pub vault_authority: AccountInfo<'info>,
     pub token_program: AccountInfo<'info>,
 }
@@ -201,7 +208,10 @@ pub struct Withdraw<'info> {
         close = giver
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
-    #[account()]
+    #[account(
+        seeds = [b"escrow"],
+        bump = escrow_account.vault_authority_bump
+    )]
     pub vault_authority: AccountInfo<'info>,
     pub token_program: AccountInfo<'info>,
 }

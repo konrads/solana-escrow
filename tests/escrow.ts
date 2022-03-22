@@ -13,6 +13,7 @@ describe("escrow", () => {
   const airdrop      = 1000000000;
   const giverBalance = 10000000;
   const escrowAmount = 100000;
+  const bogusPublicKey = Keypair.generate().publicKey;
 
   type TestCtx = {
     giver?: anchor.web3.Keypair;
@@ -254,11 +255,8 @@ describe("escrow", () => {
     expectError(async () => getAccount(provider.connection, ctx.escrowAccount.publicKey) , 'TokenAccountNotFoundError');
   });
 
-  it("Deposit failures", async () => {
+  it("Deposit failure - bogus mint", async () => {
     const ctx = await setup();
-
-    const bogusKeypair = Keypair.generate();
-    const bogusPublicKey = Keypair.generate().publicKey;
 
     // use incorrect mint
     await expectError(async () => {
@@ -283,8 +281,12 @@ describe("escrow", () => {
         }
       );
     }, `3012: The program expected this account to be already initialized`);
+  });
 
-    // use incorrect mint
+  it("Deposit failure - bogus vaultAuthority", async () => {
+    const ctx = await setup();
+
+    // use non pda vaultAuthority
     await expectError(async () => {
       await program.rpc.deposit(
         new BN(escrowAmount),
@@ -294,7 +296,7 @@ describe("escrow", () => {
             mint: ctx.mint,
             giver: ctx.giver.publicKey,
             taker: ctx.taker.publicKey,
-            vaultAuthority: ctx.vaultAuthority,
+            vaultAuthority: bogusPublicKey,
             giverTokenAccount: ctx.giverTokenAccount,
             takerTokenAccount: ctx.takerTokenAccount,
             vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
@@ -306,8 +308,36 @@ describe("escrow", () => {
           signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
         }
       );
-    }, `3012: The program expected this account to be already initialized`);
+    }, `2006: A seeds constraint was violated`);
+  });
 
+  it("Deposit failure - empty giver account", async () => {
+    const ctx = await setup();
+    // use empty (no tokens) giver token account
+    let emptyTokenAccount = await createAccount(provider.connection, ctx.giver, ctx.mint, ctx.giver.publicKey);
+
+    await expectError(async () => {
+      await program.rpc.deposit(
+        new BN(escrowAmount),
+        new BN(ctx.vaultAuthorityBump),
+        {
+          accounts: {
+            mint: ctx.mint,
+            giver: ctx.giver.publicKey,
+            taker: ctx.taker.publicKey,
+            vaultAuthority: ctx.vaultAuthority,
+            giverTokenAccount: emptyTokenAccount,
+            takerTokenAccount: ctx.takerTokenAccount,
+            vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+            escrowAccount: ctx.escrowAccount.publicKey,
+            systemProgram: SystemProgram.programId,
+            tokenProgram: TOKEN_PROGRAM_ID,
+            rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          },
+          signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
+        }
+      );
+    }, `...empty giver token account...`);
 });
 
   // it("Release failures", async () => {
