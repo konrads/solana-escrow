@@ -1,7 +1,13 @@
 import * as anchor from "@project-serum/anchor";
 import { Program, BN, IdlAccounts } from "@project-serum/anchor";
 import { PublicKey, Keypair, SystemProgram } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID, createMint, createAccount, mintTo, getAccount } from "@solana/spl-token";
+import {
+  TOKEN_PROGRAM_ID,
+  createMint,
+  createAccount,
+  mintTo,
+  getAccount,
+} from "@solana/spl-token";
 import { assert } from "chai";
 import { Escrow } from "../target/types/escrow";
 
@@ -10,11 +16,12 @@ type EscrowAccount = IdlAccounts<Escrow>["escrowAccount"];
 describe("escrow", () => {
   const provider = anchor.Provider.env();
   const program = anchor.workspace.Escrow as Program<Escrow>;
-  const airdrop      = 1000000000;
+  const airdrop = 1000000000;
   const giverBalance = 10000000;
   const escrowAmount = 100000;
   const bogusPublicKey = Keypair.generate().publicKey;
 
+  // I do like this.
   type TestCtx = {
     giver?: anchor.web3.Keypair;
     taker?: anchor.web3.Keypair;
@@ -26,7 +33,7 @@ describe("escrow", () => {
     takerTokenAccount?: PublicKey;
     escrowAccount?: anchor.web3.Keypair;
     vaultTokenAccount?: anchor.web3.Keypair;
-  }
+  };
 
   async function setup(): Promise<TestCtx> {
     let ctx: TestCtx = {};
@@ -48,12 +55,35 @@ describe("escrow", () => {
     );
 
     // mint holds token metadata
-    ctx.mint = await createMint(provider.connection, ctx.giver, ctx.mintAuthority.publicKey, null, 0);
+    ctx.mint = await createMint(
+      provider.connection,
+      ctx.giver,
+      ctx.mintAuthority.publicKey,
+      null,
+      0
+    );
 
-    ctx.giverTokenAccount = await createAccount(provider.connection, ctx.giver, ctx.mint, ctx.giver.publicKey);
-    ctx.takerTokenAccount = await createAccount(provider.connection, ctx.taker, ctx.mint, ctx.taker.publicKey);
+    ctx.giverTokenAccount = await createAccount(
+      provider.connection,
+      ctx.giver,
+      ctx.mint,
+      ctx.giver.publicKey
+    );
+    ctx.takerTokenAccount = await createAccount(
+      provider.connection,
+      ctx.taker,
+      ctx.mint,
+      ctx.taker.publicKey
+    );
 
-    await mintTo(provider.connection, ctx.giver, ctx.mint, ctx.giverTokenAccount, ctx.mintAuthority, giverBalance);
+    await mintTo(
+      provider.connection,
+      ctx.giver,
+      ctx.mint,
+      ctx.giverTokenAccount,
+      ctx.mintAuthority,
+      giverBalance
+    );
 
     const [_pda, _bumpSeed] = await PublicKey.findProgramAddress(
       [Buffer.from(anchor.utils.bytes.utf8.encode("escrow"))],
@@ -92,8 +122,12 @@ describe("escrow", () => {
       }
     );
 
-    let _vaultTokenAccountA = await getAccount(provider.connection, ctx.vaultTokenAccount.publicKey);
-    let _escrowAccount: EscrowAccount = await program.account.escrowAccount.fetch(ctx.escrowAccount.publicKey);
+    let _vaultTokenAccountA = await getAccount(
+      provider.connection,
+      ctx.vaultTokenAccount.publicKey
+    );
+    let _escrowAccount: EscrowAccount =
+      await program.account.escrowAccount.fetch(ctx.escrowAccount.publicKey);
 
     // Validate new vault authority
     assert.ok(_vaultTokenAccountA.owner.equals(ctx.vaultAuthority));
@@ -104,7 +138,7 @@ describe("escrow", () => {
     assert.equal(_escrowAccount.amount.toNumber(), escrowAmount);
     assert.equal(_escrowAccount.vaultAuthorityBump, ctx.vaultAuthorityBump);
     assert.ok(_escrowAccount.giverTokenAccount.equals(ctx.giverTokenAccount));
-    assert.ok(! _escrowAccount.isReleased);
+    assert.ok(!_escrowAccount.isReleased);
   });
 
   it("Release escrow funds", async () => {
@@ -131,17 +165,16 @@ describe("escrow", () => {
       }
     );
 
-    await program.rpc.release(
-      {
-        accounts: {
-          giver: ctx.giver.publicKey,
-          escrowAccount: ctx.escrowAccount.publicKey,
-        },
-        signers: [ctx.giver],
-      }
-    );
+    await program.rpc.release({
+      accounts: {
+        giver: ctx.giver.publicKey,
+        escrowAccount: ctx.escrowAccount.publicKey,
+      },
+      signers: [ctx.giver],
+    });
 
-    let _escrowAccount: EscrowAccount = await program.account.escrowAccount.fetch(ctx.escrowAccount.publicKey);
+    let _escrowAccount: EscrowAccount =
+      await program.account.escrowAccount.fetch(ctx.escrowAccount.publicKey);
 
     // Validate new vault authority
     assert.ok(_escrowAccount.isReleased);
@@ -171,40 +204,52 @@ describe("escrow", () => {
       }
     );
 
-    await program.rpc.release(
-      {
-        accounts: {
-          giver: ctx.giver.publicKey,
-          escrowAccount: ctx.escrowAccount.publicKey,
-        },
-        signers: [ctx.giver],
-      }
-    );
+    await program.rpc.release({
+      accounts: {
+        giver: ctx.giver.publicKey,
+        escrowAccount: ctx.escrowAccount.publicKey,
+      },
+      signers: [ctx.giver],
+    });
 
-    await program.rpc.withdraw(
-      {
-        accounts: {
-          mint: ctx.mint,
-          giver: ctx.giver.publicKey,
-          taker: ctx.taker.publicKey,
-          takerTokenAccount: ctx.takerTokenAccount,
-          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
-          escrowAccount: ctx.escrowAccount.publicKey,
-          vaultAuthority: ctx.vaultAuthority,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        }
-      }
-    );
+    await program.rpc.withdraw({
+      accounts: {
+        mint: ctx.mint,
+        giver: ctx.giver.publicKey,
+        taker: ctx.taker.publicKey,
+        takerTokenAccount: ctx.takerTokenAccount,
+        vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+        escrowAccount: ctx.escrowAccount.publicKey,
+        vaultAuthority: ctx.vaultAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+    });
 
     // validate transferred amount
-    let _giverTokenAccount = await getAccount(provider.connection, ctx.giverTokenAccount);
+    let _giverTokenAccount = await getAccount(
+      provider.connection,
+      ctx.giverTokenAccount
+    );
     assert.equal(_giverTokenAccount.amount, giverBalance - escrowAmount);
-    let _takerTokenAccount = await getAccount(provider.connection, ctx.takerTokenAccount);
+    let _takerTokenAccount = await getAccount(
+      provider.connection,
+      ctx.takerTokenAccount
+    );
     assert.equal(_takerTokenAccount.amount, escrowAmount);
 
     // validate accounts no longer exist - FIXME: there must be a nicer way...
-    expectError(async () => getAccount(provider.connection, ctx.vaultTokenAccount.publicKey) , 'TokenAccountNotFoundError');
-    expectError(async () => getAccount(provider.connection, ctx.escrowAccount.publicKey),      'TokenAccountNotFoundError');
+    // Unfortunately the best way to check if account exists is via
+    // this or
+    // await connection.getAccountInfo(key) -> which will throw an error as well
+    expectError(
+      async () =>
+        getAccount(provider.connection, ctx.vaultTokenAccount.publicKey),
+      "TokenAccountNotFoundError"
+    );
+    expectError(
+      async () => getAccount(provider.connection, ctx.escrowAccount.publicKey),
+      "TokenAccountNotFoundError"
+    );
   });
 
   it("Cancels escrow", async () => {
@@ -231,29 +276,40 @@ describe("escrow", () => {
       }
     );
 
-    await program.rpc.cancel(
-      {
-        accounts: {
-          mint: ctx.mint,
-          giver: ctx.giver.publicKey,
-          giverTokenAccount: ctx.giverTokenAccount,
-          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
-          escrowAccount: ctx.escrowAccount.publicKey,
-          vaultAuthority: ctx.vaultAuthority,
-          tokenProgram: TOKEN_PROGRAM_ID,
-        }
-      }
-    );
+    await program.rpc.cancel({
+      accounts: {
+        mint: ctx.mint,
+        giver: ctx.giver.publicKey,
+        giverTokenAccount: ctx.giverTokenAccount,
+        vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+        escrowAccount: ctx.escrowAccount.publicKey,
+        vaultAuthority: ctx.vaultAuthority,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      },
+    });
 
     // validate transferred amount
-    let _giverTokenAccount = await getAccount(provider.connection, ctx.giverTokenAccount);
+    let _giverTokenAccount = await getAccount(
+      provider.connection,
+      ctx.giverTokenAccount
+    );
     assert.equal(_giverTokenAccount.amount, giverBalance);
-    let _takerTokenAccount = await getAccount(provider.connection, ctx.takerTokenAccount);
+    let _takerTokenAccount = await getAccount(
+      provider.connection,
+      ctx.takerTokenAccount
+    );
     assert.equal(_takerTokenAccount.amount, 0);
 
     // validate accounts no longer exist - FIXME: there must be a nicer way...
-    expectError(async () => getAccount(provider.connection, ctx.vaultTokenAccount.publicKey) , 'TokenAccountNotFoundError');
-    expectError(async () => getAccount(provider.connection, ctx.escrowAccount.publicKey) , 'TokenAccountNotFoundError');
+    expectError(
+      async () =>
+        getAccount(provider.connection, ctx.vaultTokenAccount.publicKey),
+      "TokenAccountNotFoundError"
+    );
+    expectError(
+      async () => getAccount(provider.connection, ctx.escrowAccount.publicKey),
+      "TokenAccountNotFoundError"
+    );
   });
 
   it("Release and cancels failure", async () => {
@@ -280,36 +336,35 @@ describe("escrow", () => {
       }
     );
 
-    await program.rpc.release(
-      {
-        accounts: {
-          giver: ctx.giver.publicKey,
-          escrowAccount: ctx.escrowAccount.publicKey,
-        },
-        signers: [ctx.giver],
-      }
-    );
-    
+    await program.rpc.release({
+      accounts: {
+        giver: ctx.giver.publicKey,
+        escrowAccount: ctx.escrowAccount.publicKey,
+      },
+      signers: [ctx.giver],
+    });
+
     await expectError(async () => {
-      await program.rpc.cancel(
-        {
-          accounts: {
-            mint: ctx.mint,
-            giver: ctx.giver.publicKey,
-            giverTokenAccount: ctx.giverTokenAccount,
-            vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
-            escrowAccount: ctx.escrowAccount.publicKey,
-            vaultAuthority: ctx.vaultAuthority,
-            tokenProgram: TOKEN_PROGRAM_ID,
-          }
-        }
-      )}, `6000: Attempted cancel after release`);
+      await program.rpc.cancel({
+        accounts: {
+          mint: ctx.mint,
+          giver: ctx.giver.publicKey,
+          giverTokenAccount: ctx.giverTokenAccount,
+          vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+          vaultAuthority: ctx.vaultAuthority,
+          tokenProgram: TOKEN_PROGRAM_ID,
+        },
+      });
+    }, `6000: Attempted cancel after release`);
   });
 
   it("Deposit failure - bogus mint", async () => {
     const ctx = await setup();
 
     // use incorrect mint
+    // I believe this one actually fails because the smart contract fails to deserialize bogus mint
+    // public key into the Mint account.
     await expectError(async () => {
       await program.rpc.deposit(
         new BN(escrowAmount),
@@ -366,8 +421,21 @@ describe("escrow", () => {
     const ctx = await setup();
     await sleep(1000);
     // use empty (no tokens) giver token account
-    let emptyTokenAccount = await createAccount(provider.connection, ctx.giver, ctx.mint, ctx.giver.publicKey, Keypair.generate());
-    await mintTo(provider.connection, ctx.giver, ctx.mint, emptyTokenAccount, ctx.mintAuthority, 100);
+    let emptyTokenAccount = await createAccount(
+      provider.connection,
+      ctx.giver,
+      ctx.mint,
+      ctx.giver.publicKey,
+      Keypair.generate()
+    );
+    await mintTo(
+      provider.connection,
+      ctx.giver,
+      ctx.mint,
+      emptyTokenAccount,
+      ctx.mintAuthority,
+      100
+    );
 
     await expectError(async () => {
       await program.rpc.deposit(
@@ -420,16 +488,14 @@ describe("escrow", () => {
 
     // using wallet that wasn't used in deposit
     await expectError(async () => {
-      await program.rpc.release(
-        {
-          accounts: {
-            giver: bogusWallet.publicKey,
-            escrowAccount: ctx.escrowAccount.publicKey,
-          },
-          signers: [bogusWallet],
-        }
-      );
-    }, `2003: A raw constraint was violated`);
+      await program.rpc.release({
+        accounts: {
+          giver: bogusWallet.publicKey,
+          escrowAccount: ctx.escrowAccount.publicKey,
+        },
+        signers: [bogusWallet],
+      });
+    }, `2003: A raw constraint was violated`); // FYI - using the @ error in the constraints gives you more informative errors than this.
   });
 
   // it("Cancel failures", async () => {
@@ -439,17 +505,17 @@ describe("escrow", () => {
   // it("Withdraw failures", async () => {
   //   throw Error("unimplemented!")
   // });
-
 });
-
 
 ///////////////////// Utils /////////////////////
 async function expectError(fn: Function, errorMsg: String) {
   try {
     await fn();
-    assert.fail(`Unexpected success of ${fn}, expected error message: ${errorMsg}`)
+    assert.fail(
+      `Unexpected success of ${fn}, expected error message: ${errorMsg}`
+    );
   } catch (err: any) {
-    assert.equal(err.message, errorMsg, `Unexpected error message`)
+    assert.equal(err.message, errorMsg, `Unexpected error message`);
   }
 }
 

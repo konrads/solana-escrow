@@ -16,9 +16,16 @@ describe("debug", () => {
       "confirmed"
     );
     const mintAuthority = Keypair.generate();
-    const mint = await createMint(provider.connection, user, mintAuthority.publicKey, null, 0);
+    const mint = await createMint(
+      provider.connection,
+      user,
+      mintAuthority.publicKey,
+      null,
+      0
+    );
 
     await createAccount(provider.connection, user, mint, user.publicKey, acc1);
+    // This test runs fine for me.
     await createAccount(provider.connection, user, mint, user.publicKey, acc2);
   });
 });
