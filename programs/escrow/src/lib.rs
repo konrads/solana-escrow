@@ -143,7 +143,7 @@ pub struct Deposit<'info> {
     pub giver_token_account: Account<'info, TokenAccount>,
     #[account(constraint = taker_token_account.mint == mint.key())]
     pub taker_token_account: Account<'info, TokenAccount>,
-    #[account(init, payer = giver, token::mint = mint, token::authority = vault_authority)]  // can assign to vault_account straight away? also, seen following elsewhere... seeds = [b"token-seed".as_ref()], bump = vault_account_bump,
+    #[account(init, payer = giver, token::mint = mint, token::authority = vault_authority)]
     pub vault_token_account: Account<'info, TokenAccount>,
     #[account(init, payer = giver)]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -167,11 +167,12 @@ pub struct Cancel<'info> {
     pub giver: AccountInfo<'info>,
     #[account(mut, constraint = giver_token_account.mint == mint.key())]
     pub giver_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
+    #[account(mut, constraint = vault_token_account.mint == mint.key())]
     pub vault_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
-        constraint = escrow_account.giver_key == *giver.key && escrow_account.giver_token_account == *giver_token_account.to_account_info().key,
+        constraint = escrow_account.giver_key == *giver.key,
+        constraint = escrow_account.giver_token_account == *giver_token_account.to_account_info().key,
         close = giver
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
@@ -192,11 +193,13 @@ pub struct Withdraw<'info> {
     pub taker: AccountInfo<'info>,
     #[account(mut, constraint = taker_token_account.mint == mint.key())]
     pub taker_token_account: Account<'info, TokenAccount>,
-    #[account(mut)]
+    #[account(mut, constraint = vault_token_account.mint == mint.key())]
     pub vault_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
-        constraint = escrow_account.is_released && escrow_account.taker_key == *taker.key && escrow_account.giver_key == *giver.key,
+        constraint = escrow_account.is_released,
+        constraint = escrow_account.taker_key == *taker.key,
+        constraint = escrow_account.giver_key == *giver.key,
         close = giver
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
