@@ -70,10 +70,11 @@ describe("escrow", () => {
 
   it("Deposit into escrow", async () => {
     const ctx = await setup();
-
     await program.rpc.deposit(
-      new BN(escrowAmount),
-      new BN(ctx.vaultAuthorityBump),
+      {
+        amount: new BN(escrowAmount),
+        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+      },
       {
         accounts: {
           mint: ctx.mint,
@@ -81,7 +82,6 @@ describe("escrow", () => {
           taker: ctx.taker.publicKey,
           vaultAuthority: ctx.vaultAuthority,
           giverTokenAccount: ctx.giverTokenAccount,
-          takerTokenAccount: ctx.takerTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
           escrowAccount: ctx.escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
@@ -103,7 +103,6 @@ describe("escrow", () => {
     assert.ok(_escrowAccount.takerKey.equals(ctx.taker.publicKey));
     assert.equal(_escrowAccount.amount.toNumber(), escrowAmount);
     assert.equal(_escrowAccount.vaultAuthorityBump, ctx.vaultAuthorityBump);
-    assert.ok(_escrowAccount.giverTokenAccount.equals(ctx.giverTokenAccount));
     assert.ok(! _escrowAccount.isReleased);
   });
 
@@ -111,8 +110,10 @@ describe("escrow", () => {
     const ctx = await setup();
 
     await program.rpc.deposit(
-      new BN(escrowAmount),
-      new BN(ctx.vaultAuthorityBump),
+      {
+        amount: new BN(escrowAmount),
+        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+      },
       {
         accounts: {
           mint: ctx.mint,
@@ -120,7 +121,6 @@ describe("escrow", () => {
           taker: ctx.taker.publicKey,
           vaultAuthority: ctx.vaultAuthority,
           giverTokenAccount: ctx.giverTokenAccount,
-          takerTokenAccount: ctx.takerTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
           escrowAccount: ctx.escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
@@ -151,8 +151,10 @@ describe("escrow", () => {
     const ctx = await setup();
 
     await program.rpc.deposit(
-      new BN(escrowAmount),
-      new BN(ctx.vaultAuthorityBump),
+      {
+        amount: new BN(escrowAmount),
+        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+      },
       {
         accounts: {
           mint: ctx.mint,
@@ -160,7 +162,6 @@ describe("escrow", () => {
           taker: ctx.taker.publicKey,
           vaultAuthority: ctx.vaultAuthority,
           giverTokenAccount: ctx.giverTokenAccount,
-          takerTokenAccount: ctx.takerTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
           escrowAccount: ctx.escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
@@ -211,8 +212,10 @@ describe("escrow", () => {
     const ctx = await setup();
 
     await program.rpc.deposit(
-      new BN(escrowAmount),
-      new BN(ctx.vaultAuthorityBump),
+      {
+        amount: new BN(escrowAmount),
+        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+      },
       {
         accounts: {
           mint: ctx.mint,
@@ -220,7 +223,6 @@ describe("escrow", () => {
           taker: ctx.taker.publicKey,
           vaultAuthority: ctx.vaultAuthority,
           giverTokenAccount: ctx.giverTokenAccount,
-          takerTokenAccount: ctx.takerTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
           escrowAccount: ctx.escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
@@ -236,7 +238,7 @@ describe("escrow", () => {
         accounts: {
           mint: ctx.mint,
           giver: ctx.giver.publicKey,
-          giverTokenAccount: ctx.giverTokenAccount,
+          refundTokenAccount: ctx.giverTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
           escrowAccount: ctx.escrowAccount.publicKey,
           vaultAuthority: ctx.vaultAuthority,
@@ -260,8 +262,10 @@ describe("escrow", () => {
     const ctx = await setup();
 
     await program.rpc.deposit(
-      new BN(escrowAmount),
-      new BN(ctx.vaultAuthorityBump),
+      {
+        amount: new BN(escrowAmount),
+        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+      },
       {
         accounts: {
           mint: ctx.mint,
@@ -269,7 +273,6 @@ describe("escrow", () => {
           taker: ctx.taker.publicKey,
           vaultAuthority: ctx.vaultAuthority,
           giverTokenAccount: ctx.giverTokenAccount,
-          takerTokenAccount: ctx.takerTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
           escrowAccount: ctx.escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
@@ -296,7 +299,7 @@ describe("escrow", () => {
           accounts: {
             mint: ctx.mint,
             giver: ctx.giver.publicKey,
-            giverTokenAccount: ctx.giverTokenAccount,
+            refundTokenAccount: ctx.giverTokenAccount,
             vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
             escrowAccount: ctx.escrowAccount.publicKey,
             vaultAuthority: ctx.vaultAuthority,
@@ -312,8 +315,10 @@ describe("escrow", () => {
     // use incorrect mint
     await expectError(async () => {
       await program.rpc.deposit(
-        new BN(escrowAmount),
-        new BN(ctx.vaultAuthorityBump),
+        {
+          amount: new BN(escrowAmount),
+          vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        },
         {
           accounts: {
             mint: bogusPublicKey,
@@ -321,7 +326,6 @@ describe("escrow", () => {
             taker: ctx.taker.publicKey,
             vaultAuthority: ctx.vaultAuthority,
             giverTokenAccount: ctx.giverTokenAccount,
-            takerTokenAccount: ctx.takerTokenAccount,
             vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
             escrowAccount: ctx.escrowAccount.publicKey,
             systemProgram: SystemProgram.programId,
@@ -340,8 +344,10 @@ describe("escrow", () => {
     // use non pda vaultAuthority
     await expectError(async () => {
       await program.rpc.deposit(
-        new BN(escrowAmount),
-        new BN(ctx.vaultAuthorityBump),
+        {
+          amount: new BN(escrowAmount),
+          vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        },
         {
           accounts: {
             mint: ctx.mint,
@@ -349,7 +355,6 @@ describe("escrow", () => {
             taker: ctx.taker.publicKey,
             vaultAuthority: bogusPublicKey,
             giverTokenAccount: ctx.giverTokenAccount,
-            takerTokenAccount: ctx.takerTokenAccount,
             vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
             escrowAccount: ctx.escrowAccount.publicKey,
             systemProgram: SystemProgram.programId,
@@ -371,8 +376,10 @@ describe("escrow", () => {
 
     await expectError(async () => {
       await program.rpc.deposit(
-        new BN(escrowAmount),
-        new BN(ctx.vaultAuthorityBump),
+        {
+          amount: new BN(escrowAmount),
+          vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        },
         {
           accounts: {
             mint: ctx.mint,
@@ -380,7 +387,6 @@ describe("escrow", () => {
             taker: ctx.taker.publicKey,
             vaultAuthority: ctx.vaultAuthority,
             giverTokenAccount: emptyTokenAccount,
-            takerTokenAccount: ctx.takerTokenAccount,
             vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
             escrowAccount: ctx.escrowAccount.publicKey,
             systemProgram: SystemProgram.programId,
@@ -390,7 +396,7 @@ describe("escrow", () => {
           signers: [ctx.giver, ctx.escrowAccount, ctx.vaultTokenAccount],
         }
       );
-    }, `2003: A raw constraint was violated`);
+    }, `6003: Insufficient deposit amount`);
   });
 
   it("Release failures", async () => {
@@ -398,8 +404,10 @@ describe("escrow", () => {
     const bogusWallet = Keypair.generate();
 
     await program.rpc.deposit(
-      new BN(escrowAmount),
-      new BN(ctx.vaultAuthorityBump),
+      {
+        amount: new BN(escrowAmount),
+        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+      },
       {
         accounts: {
           mint: ctx.mint,
@@ -407,7 +415,6 @@ describe("escrow", () => {
           taker: ctx.taker.publicKey,
           vaultAuthority: ctx.vaultAuthority,
           giverTokenAccount: ctx.giverTokenAccount,
-          takerTokenAccount: ctx.takerTokenAccount,
           vaultTokenAccount: ctx.vaultTokenAccount.publicKey,
           escrowAccount: ctx.escrowAccount.publicKey,
           systemProgram: SystemProgram.programId,
