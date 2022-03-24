@@ -73,7 +73,7 @@ describe("escrow", () => {
     await program.rpc.deposit(
       {
         amount: new BN(escrowAmount),
-        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        vaultAuthorityBump: ctx.vaultAuthorityBump,
       },
       {
         accounts: {
@@ -112,7 +112,7 @@ describe("escrow", () => {
     await program.rpc.deposit(
       {
         amount: new BN(escrowAmount),
-        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        vaultAuthorityBump: ctx.vaultAuthorityBump,
       },
       {
         accounts: {
@@ -153,7 +153,7 @@ describe("escrow", () => {
     await program.rpc.deposit(
       {
         amount: new BN(escrowAmount),
-        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        vaultAuthorityBump: ctx.vaultAuthorityBump,
       },
       {
         accounts: {
@@ -214,7 +214,7 @@ describe("escrow", () => {
     await program.rpc.deposit(
       {
         amount: new BN(escrowAmount),
-        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        vaultAuthorityBump: ctx.vaultAuthorityBump,
       },
       {
         accounts: {
@@ -264,7 +264,7 @@ describe("escrow", () => {
     await program.rpc.deposit(
       {
         amount: new BN(escrowAmount),
-        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        vaultAuthorityBump: ctx.vaultAuthorityBump,
       },
       {
         accounts: {
@@ -317,7 +317,7 @@ describe("escrow", () => {
       await program.rpc.deposit(
         {
           amount: new BN(escrowAmount),
-          vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+          vaultAuthorityBump: ctx.vaultAuthorityBump,
         },
         {
           accounts: {
@@ -346,7 +346,7 @@ describe("escrow", () => {
       await program.rpc.deposit(
         {
           amount: new BN(escrowAmount),
-          vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+          vaultAuthorityBump: ctx.vaultAuthorityBump,
         },
         {
           accounts: {
@@ -378,7 +378,7 @@ describe("escrow", () => {
       await program.rpc.deposit(
         {
           amount: new BN(escrowAmount),
-          vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+          vaultAuthorityBump: ctx.vaultAuthorityBump,
         },
         {
           accounts: {
@@ -406,7 +406,7 @@ describe("escrow", () => {
     await program.rpc.deposit(
       {
         amount: new BN(escrowAmount),
-        vaultAuthorityBump: new BN(ctx.vaultAuthorityBump),
+        vaultAuthorityBump: ctx.vaultAuthorityBump,
       },
       {
         accounts: {
