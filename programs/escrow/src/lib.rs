@@ -16,13 +16,16 @@ pub enum ErrorCode {
     #[msg("Account not owned by giver")]
     NonGiverAccountError,
 }
+use ErrorCode::*;
 
 const ESCROW_PDA_SEED: &[u8] = b"escrow";
+const VAULT_TOKEN_PDA_SEED: &[u8] = b"escrow_vault_token";
 
 #[derive(AnchorSerialize, AnchorDeserialize)]
 pub struct DepositArgs {
     pub amount: u64,
-    pub vault_authority_bump: u8
+    pub vault_token_account_bump: u8,
+    pub escrow_account_bump: u8,
 }
 
 #[program]
@@ -34,13 +37,15 @@ pub mod escrow {
     /// - set vault_token_account authority to PDA
     /// - transfer funds from giver_token_account to vault_token_account
     pub fn deposit(ctx: Context<Deposit>, args: DepositArgs) -> ProgramResult {
-        let Deposit { giver, taker, giver_token_account, vault_token_account, token_program, escrow_account, .. } = ctx.accounts;
-
+        let Deposit { giver, taker, giver_token_account, vault_token_account, token_program, escrow_account, mint, .. } = ctx.accounts;
+        
+        escrow_account.mint = *mint.to_account_info().key;
         escrow_account.giver_key = *giver.key;
         escrow_account.taker_key = *taker.key;
         escrow_account.refund_token_account = *giver_token_account.to_account_info().key;
         escrow_account.amount = args.amount;
-        escrow_account.vault_authority_bump = args.vault_authority_bump;
+        escrow_account.escrow_account_bump = args.escrow_account_bump;
+        escrow_account.vault_token_account_bump = args.vault_token_account_bump;
         escrow_account.is_released = false;
 
         // transfer the token to vault_account
@@ -65,12 +70,12 @@ pub mod escrow {
     /// - transfer funds back to giver
     /// - close the vault_token_account and escrow_account
     pub fn cancel(ctx: Context<Cancel>) -> ProgramResult {
-        let Cancel { giver, refund_token_account, vault_token_account, vault_authority, token_program, escrow_account, .. } = ctx.accounts;
+        let Cancel { giver, refund_token_account, vault_token_account, token_program, escrow_account, .. } = ctx.accounts;
         if escrow_account.is_released {
             return Err(ErrorCode::CancelReleasedAccountError.into())
         }
 
-        let authority_seeds = &[&ESCROW_PDA_SEED[..], &[escrow_account.vault_authority_bump]];
+        let authority_seeds = &[&VAULT_TOKEN_PDA_SEED[..], &[escrow_account.vault_token_account_bump]];
 
         token::transfer(
             CpiContext::new(
@@ -78,9 +83,9 @@ pub mod escrow {
                 Transfer {
                     from:      vault_token_account.to_account_info().clone(),
                     to:        refund_token_account.to_account_info().clone(),
-                    authority: vault_authority.clone(),
+                    authority: escrow_account.to_account_info(),
                 }
-            ).with_signer(&[&authority_seeds[..]]),  // needed as vault_pda wasn't used as signer
+            ).with_signer(&[&authority_seeds[..]]),
             escrow_account.amount
         )?;
         token::close_account(
@@ -89,7 +94,7 @@ pub mod escrow {
                 CloseAccount {
                     account:     vault_token_account.to_account_info().clone(),
                     destination: giver.clone(),
-                    authority:   vault_authority.clone(),
+                    authority:   escrow_account.to_account_info(),
                 }
             ).with_signer(&[&authority_seeds[..]])
         )?;
@@ -101,8 +106,8 @@ pub mod escrow {
     /// - transfer funds to taker
     /// - close the vault_token_account and escrow_account
     pub fn withdraw(ctx: Context<Withdraw>) -> ProgramResult {
-        let Withdraw { giver, taker_token_account, vault_token_account, vault_authority, token_program, escrow_account, .. } = ctx.accounts;
-        let authority_seeds = &[&ESCROW_PDA_SEED[..], &[escrow_account.vault_authority_bump]];
+        let Withdraw { giver, taker_token_account, vault_token_account, token_program, escrow_account, .. } = ctx.accounts;
+        let authority_seeds = &[&VAULT_TOKEN_PDA_SEED[..], &[escrow_account.vault_token_account_bump]];
 
         token::transfer(
             CpiContext::new(
@@ -110,7 +115,7 @@ pub mod escrow {
                 Transfer {
                     from:      vault_token_account.to_account_info().clone(),
                     to:        taker_token_account.to_account_info().clone(),
-                    authority: vault_authority.clone(),
+                    authority: escrow_account.to_account_info(),
                 }
             ).with_signer(&[&authority_seeds[..]]),
             escrow_account.amount
@@ -121,7 +126,7 @@ pub mod escrow {
                 CloseAccount {
                     account:     vault_token_account.to_account_info().clone(),
                     destination: giver.clone(),
-                    authority:   vault_authority.clone(),
+                    authority:   escrow_account.to_account_info(),
                 }
             ).with_signer(&[&authority_seeds[..]]),
         )?;
@@ -136,38 +141,42 @@ pub struct EscrowAccount {
     pub giver_key: Pubkey,
     pub taker_key: Pubkey,
     pub refund_token_account: Pubkey,
+    pub mint: Pubkey,
     pub amount: u64,
-    pub vault_authority_bump: u8,
+    pub escrow_account_bump: u8,
+    pub vault_token_account_bump: u8,
     pub is_released: bool,
 }
 
 #[derive(Accounts)]
-#[instruction(amount: u64, vault_authority_bump: u8)]
+#[instruction(args: DepositArgs)]
 pub struct Deposit<'info> {
     pub mint: Account<'info, Mint>,
     #[account(mut)]
     pub giver: Signer<'info>,
     pub taker: AccountInfo<'info>,
     #[account(
-        seeds = [ESCROW_PDA_SEED],
-        bump = vault_authority_bump
-    )]
-    pub vault_authority: AccountInfo<'info>,
-    #[account(
         mut,
-        constraint = giver_token_account.mint == mint.key() @ ErrorCode::UnexpectedMintError,
-        constraint = giver_token_account.owner == giver.key() @ ErrorCode::NonGiverAccountError,
-        constraint = giver_token_account.amount >= amount @ ErrorCode::InsufficientDepositAmountError,
+        constraint = giver_token_account.mint == mint.key() @ UnexpectedMintError,
+        constraint = giver_token_account.owner == giver.key() @ NonGiverAccountError,
+        constraint = giver_token_account.amount >= args.amount @ InsufficientDepositAmountError,
     )]
     pub giver_token_account: Account<'info, TokenAccount>,
     #[account(
         init,
         payer = giver,
         token::mint = mint,
-        token::authority = vault_authority
+        token::authority = escrow_account,
+        seeds = [VAULT_TOKEN_PDA_SEED, escrow_account.key().to_bytes().as_ref()],
+        bump = args.vault_token_account_bump
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
-    #[account(init, payer = giver)]
+    #[account(
+        init,
+        payer = giver,
+        seeds = [ESCROW_PDA_SEED, giver.key().to_bytes().as_ref()],
+        bump = args.escrow_account_bump
+    )]
     pub escrow_account: Account<'info, EscrowAccount>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -184,48 +193,46 @@ pub struct Release<'info> {
 
 #[derive(Accounts)]
 pub struct Cancel<'info> {
-    pub mint: Account<'info, Mint>,
     #[account(mut)]
     pub giver: AccountInfo<'info>,
     #[account(
         mut,
-        constraint = refund_token_account.mint == mint.key(),
+        constraint = refund_token_account.mint == escrow_account.mint.key(),
     )]
     pub refund_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
-        constraint = vault_token_account.mint == mint.key() @ ErrorCode::UnexpectedMintError,
-        constraint = vault_token_account.owner == vault_authority.key() @ ErrorCode::UnexpectedVaultAuthorityError
+        constraint = vault_token_account.mint == escrow_account.mint.key() @ UnexpectedMintError,
+        constraint = vault_token_account.owner == escrow_account.key() @ UnexpectedVaultAuthorityError,
+        seeds = [VAULT_TOKEN_PDA_SEED, escrow_account.key().to_bytes().as_ref()],
+        bump = escrow_account.vault_token_account_bump
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
         constraint = escrow_account.giver_key == giver.key(),
         constraint = escrow_account.refund_token_account == refund_token_account.key(),
+        seeds = [ESCROW_PDA_SEED, giver.key().to_bytes().as_ref()],
+        bump = escrow_account.escrow_account_bump,
         close = giver
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
-    #[account(
-        seeds = [b"escrow"],
-        bump = escrow_account.vault_authority_bump
-    )]
-    pub vault_authority: AccountInfo<'info>,
     pub token_program: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
 pub struct Withdraw<'info> {
-    pub mint: Account<'info, Mint>,
-    #[account(mut)]
     pub giver: AccountInfo<'info>,
     #[account()]
     pub taker: AccountInfo<'info>,
-    #[account(mut, constraint = taker_token_account.mint == mint.key())]
+    #[account(mut, constraint = taker_token_account.mint == escrow_account.mint.key())]
     pub taker_token_account: Account<'info, TokenAccount>,
     #[account(
         mut,
-        constraint = vault_token_account.mint == mint.key() @ ErrorCode::UnexpectedMintError,
-        constraint = vault_token_account.owner == vault_authority.key() @ ErrorCode::UnexpectedVaultAuthorityError,
+        constraint = vault_token_account.mint == escrow_account.mint.key() @ UnexpectedMintError,
+        constraint = vault_token_account.owner == escrow_account.key() @ UnexpectedVaultAuthorityError,
+        seeds = [VAULT_TOKEN_PDA_SEED, escrow_account.key().to_bytes().as_ref()],
+        bump = escrow_account.vault_token_account_bump
     )]
     pub vault_token_account: Account<'info, TokenAccount>,
     #[account(
@@ -233,13 +240,10 @@ pub struct Withdraw<'info> {
         constraint = escrow_account.is_released,
         constraint = escrow_account.taker_key == *taker.key,
         constraint = escrow_account.giver_key == *giver.key,
+        seeds = [ESCROW_PDA_SEED, giver.key().to_bytes().as_ref()],
+        bump = escrow_account.escrow_account_bump,
         close = giver
     )]
     pub escrow_account: Account<'info, EscrowAccount>,
-    #[account(
-        seeds = [b"escrow"],
-        bump = escrow_account.vault_authority_bump
-    )]
-    pub vault_authority: AccountInfo<'info>,
     pub token_program: Program<'info, Token>,
 }
